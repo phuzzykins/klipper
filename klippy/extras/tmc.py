@@ -498,11 +498,35 @@ class TMCVirtualPinHelper:
                                             self.handle_homing_move_begin)
         self.printer.register_event_handler("homing:homing_move_end",
                                             self.handle_homing_move_end)
+        
+        # MRF
+        self.printer.register_event_handler("probe:probing_move_begin",
+                                            self.handle_probing_move_begin)
+        self.printer.register_event_handler("probe:probing_move_end",
+                                            self.handle_probing_move_end)
+        
         self.mcu_endstop = ppins.setup_pin('endstop', self.diag_pin)
         return self.mcu_endstop
+    
+    # MRF
+    def handle_probing_move_begin(self, pmove):
+        logging.info(f'probing move begin')
+        self.enable_sensorless_homing()
+
+    # MRF
+    def handle_probing_move_end(self, pmove):
+        logging.info(f'probing move end')
+        self.disable_sensorless_homing()
+    
     def handle_homing_move_begin(self, hmove):
-        if self.mcu_endstop not in hmove.get_mcu_endstops():
-            return
+        if self.mcu_endstop in hmove.get_mcu_endstops():
+            self.enable_sensorless_homing()
+
+    def handle_homing_move_end(self, hmove):
+        if self.mcu_endstop in hmove.get_mcu_endstops():
+            self.disable_sensorless_homing()
+
+    def enable_sensorless_homing(self):
         # Enable/disable stealthchop
         self.pwmthrs = self.fields.get_field("tpwmthrs")
         reg = self.fields.lookup_register("en_pwm_mode", None)
@@ -529,9 +553,8 @@ class TMCVirtualPinHelper:
             self.thigh = self.fields.get_field("thigh")
             th_val = self.fields.set_field("thigh", 0)
             self.mcu_tmc.set_register(reg, th_val)
-    def handle_homing_move_end(self, hmove):
-        if self.mcu_endstop not in hmove.get_mcu_endstops():
-            return
+    
+    def disable_sensorless_homing(self):
         # Restore stealthchop/spreadcycle
         reg = self.fields.lookup_register("en_pwm_mode", None)
         if reg is None:

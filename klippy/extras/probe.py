@@ -344,6 +344,10 @@ class ProbeSessionHelper:
         curtime = self.printer.get_reactor().monotonic()
         if 'z' not in toolhead.get_status(curtime)['homed_axes']:
             raise self.printer.command_error("Must home before probe")
+        
+        # MRF
+        self.printer.send_event("probe:probing_move_begin", self)
+
         try:
             self.hw_probe_session.run_probe(gcmd)
             epos = self.hw_probe_session.pull_probed_results()[0]
@@ -352,6 +356,10 @@ class ProbeSessionHelper:
             if "Timeout during endstop homing" in reason:
                 reason += HINT_TIMEOUT
             raise self.printer.command_error(reason)
+        
+        #MRF
+        self.printer.send_event("probe:probing_move_end", self)
+
         # Allow axis_twist_compensation to update results
         self.printer.send_event("probe:update_results", epos)
         # Report results
